@@ -61,7 +61,7 @@ export function ggxOrdinalScriptByCode(
   const inscription = `{sender: ${sender},  receiver: ${receiver} }`;
 
   // make the script output
-  var s = script.compile([
+  let s = script.compile([
     Buffer.from(strPublicKey),
     opcodes.OP_CHECKSIG,
     opcodes.OP_FALSE,
