@@ -9,12 +9,19 @@ import {
   Payment,
   opcodes,
 } from "bitcoinjs-lib";
-import { broadcast, getRawTransaction } from "./blockstream_utils";
+import {
+  broadcast,
+  getRawTransaction,
+  getMempoolEntry,
+  bestBlockHash,
+  blockHeight,
+} from "./blockstream_utils";
 import { ECPairFactory, ECPairAPI, TinySecp256k1Interface } from "ecpair";
 import { Taptree } from "bitcoinjs-lib/src/types";
 
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import "@polkadot/api-augment";
+import { number } from "bitcoinjs-lib/src/script";
 
 const tinysecp: TinySecp256k1Interface = require("tiny-secp256k1");
 initEccLib(tinysecp as any);
@@ -207,18 +214,42 @@ export async function recoverLockAmount(
   return txid;
 }
 
-export async function listBoomerangsByAddress(address_h160: string) {
+export async function listBoomerangsByAddress(
+  address_h160: string,
+): Promise<any> {
+  console.log("address_h160 is: ", address_h160);
   // Construct
-  const wsProvider = new WsProvider("ws://127.0.0.1:9944");
-  const api = await ApiPromise.create({ provider: wsProvider });
+  const GGXCHAINURL = process.env.GGXCHAINURL || "ws://127.0.0.1:9944";
+  const wsProvider = new WsProvider(GGXCHAINURL);
+  const api = await ApiPromise.create({
+    provider: wsProvider,
+    noInitWarn: true,
+  });
 
-  const utxos = await api.query.btcRelay.boomerageUTXOS(
-    { p2pkh: address_h160 },
-    0,
-  );
+  const blockHash = await bestBlockHash();
+  const height = await blockHeight(blockHash);
 
-  console.log("your boomrange utxo is: ", utxos.toHuman());
+  const utxos = await api.query.btcRelay.boomerageUTXOS.entries({
+    p2pkh: address_h160,
+  });
 
-  // for (let element of utxos.toHuman()!) {
-  // }
+  let utxo_array: any[] = [];
+
+  for (let index = 0; index < utxos.length; index++) {
+    const [key, utxo] = utxos[index];
+    let v = utxo.toHuman() as any[];
+
+    let txid = v[0].content.replace(/^(0x)/, "");
+    let inMempoolEntry = await getMempoolEntry(txid);
+    let isConfirmed = height - v[2] > 10 ? true : false;
+
+    utxo_array.push({
+      txid: v[0].content,
+      index: v[1],
+      isConfirmed: isConfirmed,
+      inMempoolEntry: inMempoolEntry != null,
+    });
+  }
+
+  return utxo_array;
 }

@@ -2,6 +2,8 @@ const { Command } = require("commander"); // add this line
 const figlet = require("figlet");
 
 import { initEccLib, networks, payments } from "bitcoinjs-lib";
+import * as base58 from "bs58";
+import { cryptoWaitReady } from "@polkadot/util-crypto";
 
 import { ECPairFactory, ECPairAPI } from "ecpair";
 
@@ -11,12 +13,25 @@ import {
   listBoomerangsByAddress,
 } from "./locktime_tapscript";
 
+import {
+  blockHeight,
+  bestBlockHash,
+  uploadBoomerangeToGGXChain,
+} from "./blockstream_utils";
+
+import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
+const { stringToU8a } = require("@polkadot/util");
+
 import tinysecp = require("tiny-secp256k1");
 initEccLib(tinysecp as any);
 const ECPair: ECPairAPI = ECPairFactory(tinysecp);
 
 const GGX_PUBLIC_KEY =
   "4edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10";
+
+const GGXCHAINCLIACCOUNTSEED =
+  process.env.GGXCHAINCLIACCOUNTSEED ||
+  "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a";
 
 const network = networks.testnet;
 
@@ -78,14 +93,14 @@ async function main() {
         network: network,
       });
 
-      const { address } = payments.p2pkh({
+      const userPayment = payments.p2pkh({
         pubkey: keyPair.publicKey,
         network: networks.regtest,
       });
-      console.log("### user address ", address);
+      console.log("### user address ", userPayment.address);
 
       const gas = 300;
-      await createBoomerangAmount(
+      const txid = await createBoomerangAmount(
         keyPair,
         options.utxoTxid,
         options.utxoIndex,
@@ -95,6 +110,29 @@ async function main() {
         keyPairInteranl,
         gas,
       );
+
+      await cryptoWaitReady();
+      const keyring = new Keyring({ type: "sr25519" });
+      const GGXCliAccount = keyring.addFromUri(GGXCHAINCLIACCOUNTSEED);
+
+      const blockHash = await bestBlockHash();
+      const height = await blockHeight(blockHash);
+
+      await new Promise((r) => setTimeout(r, 10000));
+      const txHash = await uploadBoomerangeToGGXChain(
+        txid,
+        0,
+        height,
+        userPayment,
+        GGXCliAccount,
+      );
+
+      if (txHash) {
+        console.log(
+          "boomerang utxo data upload to ggx chain sucess! ggx chain",
+          txHash.toHuman(),
+        );
+      }
     } catch (error) {
       console.error("Error occurred while create boomerang!", error);
     }
@@ -144,7 +182,26 @@ async function main() {
     try {
       console.log("## listBoomerangs");
 
-      await listBoomerangsByAddress(options.addr);
+      const bytes = base58.decode(options.addr);
+      const strH160 = Buffer.from(bytes).toString("hex");
+      const newH160 = strH160.slice(2, -8);
+
+      const rt = await listBoomerangsByAddress("0x" + newH160);
+      console.log("\n");
+      if (rt.length == 0) {
+        console.log("### no any boomerang in this address!");
+      } else {
+        console.log(
+          "### you have " + rt.length + " boomerang in this address!",
+        );
+
+        for (let index = 0; index < rt.length; index++) {
+          const element = rt[index];
+          console.log(
+            `## txid: ${element.txid}, index: ${element.index}, is confirmed: ${element.isConfirmed}, is in MempoolEntry: ${element.inMempoolEntry}`,
+          );
+        }
+      }
     } catch (error) {
       console.error("Error occurred while list boomerangs!", error);
     }

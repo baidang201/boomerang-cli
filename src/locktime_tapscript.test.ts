@@ -1,5 +1,8 @@
 import { script, initEccLib, networks, payments, opcodes } from "bitcoinjs-lib";
 import { describe, expect, test } from "@jest/globals";
+import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
+import "@polkadot/api-augment";
+import * as base58 from "bs58";
 
 import {
   faucet,
@@ -7,6 +10,7 @@ import {
   mine,
   getTransactionObject,
   bestBlockHash,
+  uploadBoomerangeToGGXChain,
 } from "./blockstream_utils";
 
 import {
@@ -15,6 +19,7 @@ import {
   ggxOrdinalScriptByCode,
   cltvScript,
   toXOnly,
+  listBoomerangsByAddress,
 } from "./locktime_tapscript";
 import { Taptree } from "bitcoinjs-lib/src/types";
 
@@ -34,8 +39,7 @@ const ggx = ECPair.fromWIF(
   network,
 );
 
-// test createBoomerang
-describe("createBoomerang", function () {
+describe("createBoomerang test", function () {
   it("can createBoomerang", async function () {
     const lockTime = 100;
 
@@ -115,10 +119,7 @@ describe("createBoomerang", function () {
     expect(v.scriptPubKey.address).toBe(scriptAddr);
     expect(v.scriptPubKey.type).toBe("witness_v1_taproot");
   });
-});
 
-// test recoverLockAmount
-describe("recoverLockAmount", function () {
   it("can recoverLockAmount", async function () {
     const blockHash = await bestBlockHash();
     const height = await blockHeight(blockHash);
@@ -215,5 +216,82 @@ describe("recoverLockAmount", function () {
       gas,
     );
     expect(txidNew).toBeTruthy();
+  });
+
+  it("can listBoomerangsByAddress", async function () {
+    const lockTime = 100;
+
+    const aliceAddress = payments.p2pkh({
+      pubkey: alice.publicKey,
+      network: network,
+    });
+
+    const ggxAddress = payments.p2pkh({
+      pubkey: ggx.publicKey,
+      network: network,
+    });
+
+    expect(1).toBe(1);
+
+    const amount = 1e5;
+
+    const unspentTxid = await faucet(aliceAddress.address!, amount);
+
+    const unspentTx = await getTransactionObject(unspentTxid);
+    const vout = unspentTx.vout;
+    let unspent: { [k: string]: any } = {};
+    unspent.txId = unspentTxid;
+
+    for (let index = 0; index < vout.length; index++) {
+      const v = vout[index];
+      if (amount / 1e8 == v.value) {
+        unspent.vout = v.n;
+        unspent.value = amount;
+      }
+    }
+
+    const keypairInteranl = ECPair.makeRandom({ network: network });
+
+    const gas = 300;
+    const txid = await createBoomerangAmount(
+      alice,
+      unspent.txId,
+      unspent.vout,
+      unspent.value,
+      lockTime,
+      toXOnly(ggx.publicKey).toString("hex"),
+      keypairInteranl,
+      gas,
+    );
+
+    const keyring = new Keyring({ type: "sr25519" });
+    const alice_polka = keyring.addFromUri("//Alice", { name: "Alice" });
+
+    const blockHash = await bestBlockHash();
+    const height = await blockHeight(blockHash);
+    const txHash = await uploadBoomerangeToGGXChain(
+      txid,
+      0,
+      height,
+      aliceAddress,
+      alice_polka,
+    );
+
+    await new Promise((r) => setTimeout(r, 5000));
+
+    const bytes = base58.decode(aliceAddress.address!);
+    const strH160 = Buffer.from(bytes).toString("hex");
+    const newH160 = strH160.slice(2, -8);
+
+    const rt = await listBoomerangsByAddress("0x" + newH160);
+
+    expect(rt).toStrictEqual([
+      {
+        txid: "0x" + txid,
+        index: "0",
+        inMempoolEntry: true,
+        isConfirmed: false,
+      },
+    ]);
   });
 });

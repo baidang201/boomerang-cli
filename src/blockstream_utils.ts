@@ -1,7 +1,12 @@
 import axios from "axios";
 
+import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
+import { payments } from "bitcoinjs-lib";
+import * as base58 from "bs58";
+
 const APIPASS = process.env.APIPASS || "rpcpassword";
 const APIURL = process.env.APIURL || "http://localhost:18332";
+const GGXCHAINURL = process.env.GGXCHAINURL || "ws://127.0.0.1:9944";
 
 export async function broadcast(txHex: string) {
   const body = {
@@ -252,6 +257,85 @@ export async function bestBlockHash() {
     console.log("### getbestblockhash error: ", error.code);
     console.log(
       "### getbestblockhash error error.response: ",
+      // error.response,
+      error.response.data.error,
+    );
+  }
+}
+
+export async function getMempoolEntry(txid: string) {
+  const body = {
+    jsonrpc: "1.0",
+    method: "getmempoolentry",
+    id: "getmempoolentry",
+    params: [txid],
+  };
+
+  try {
+    console.log("### getMempoolEntry txid ", txid);
+    const response = await axios.post(APIURL, body, {
+      auth: {
+        username: "rpcuser",
+        password: APIPASS,
+      },
+    });
+
+    if (response.data != null) {
+      if (response.data.result == null) {
+        console.log(
+          "### getmempoolentry response error: ",
+          response.data.error,
+        );
+      }
+    }
+
+    return response.data.result;
+  } catch (error: any) {
+    //console.log("### getmempoolentry error: ", error);
+    console.log("### getmempoolentry error code: ", error.code);
+    console.log(
+      "### getmempoolentry error error.response: ",
+      // error.response,
+      error.response.data.error,
+    );
+  }
+}
+
+export async function uploadBoomerangeToGGXChain(
+  txid: string,
+  index: number,
+  blockHeight: number,
+  userPayment: payments.Payment,
+  keyPair: any,
+) {
+  try {
+    const wsProvider = new WsProvider(GGXCHAINURL);
+    const api = await ApiPromise.create({
+      provider: wsProvider,
+      noInitWarn: true,
+    });
+
+    const bytes = base58.decode(userPayment.address!);
+    const strH160 = Buffer.from(bytes).toString("hex");
+    const newH160 = strH160.slice(2, -8);
+
+    const txHash = await api.tx.btcRelay
+      .storeMonitorUtxo(
+        "0x" + txid,
+        index,
+        {
+          p2pkh: "0x" + newH160,
+        },
+        blockHeight,
+      )
+      .signAndSend(keyPair);
+
+    return txHash;
+  } catch (error: any) {
+    //console.log("### uploadBoomerangeToGGXChain error: ", error);
+    console.log("### uploadBoomerangeToGGXChain error code: ", error.code);
+    console.log(
+      "### uploadBoomerangeToGGXChain error error.response: ",
       // error.response,
       error.response.data.error,
     );
