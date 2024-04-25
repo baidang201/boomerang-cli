@@ -75,7 +75,7 @@ describe("createBoomerang test", function () {
     const keypairInteranl = ECPair.makeRandom({ network: network });
 
     const gas = 300;
-    const txid = await createBoomerangAmount(
+    const [txid, newAmount] = await createBoomerangAmount(
       alice,
       unspent.txId,
       unspent.vout,
@@ -155,7 +155,7 @@ describe("createBoomerang test", function () {
     const keypairInteranl = ECPair.makeRandom({ network: network });
 
     const gas = 300;
-    const txidCreateBoomerang = await createBoomerangAmount(
+    const [txidCreateBoomerang, newBoomerangAmount] = await createBoomerangAmount(
       alice,
       unspent.txId,
       unspent.vout,
@@ -253,7 +253,7 @@ describe("createBoomerang test", function () {
     const keypairInteranl = ECPair.makeRandom({ network: network });
 
     const gas = 300;
-    const txid = await createBoomerangAmount(
+    const [txid,newBoomerangAmount ] = await createBoomerangAmount(
       alice,
       unspent.txId,
       unspent.vout,
@@ -274,6 +274,7 @@ describe("createBoomerang test", function () {
       0,
       height,
       aliceAddress,
+      newBoomerangAmount,
       alice_polka,
     );
 

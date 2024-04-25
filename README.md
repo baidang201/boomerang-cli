@@ -7,7 +7,7 @@ download from https://bitcoincore.org/bin/bitcoin-core-22.0/
 macos run
 
 ```
-/Applications/Bitcoin-Qt.app/Contents/MacOS/Bitcoin-Qt -regtest -server -rpcuser=rpcuser -rpcpassword=rpcpassword -rpcport=18332
+/Applications/Bitcoin-Qt.app/Contents/MacOS/Bitcoin-Qt -regtest -server -rpcuser=rpcuser -rpcpassword=rpcpassword -rpcport=18332 -fallbackfee=0.000001
 ```
 
 linux run

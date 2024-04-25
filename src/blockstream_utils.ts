@@ -306,7 +306,8 @@ export async function uploadBoomerangeToGGXChain(
   index: number,
   blockHeight: number,
   userPayment: payments.Payment,
-  keyPair: any,
+  amount: number,
+  keyPair: any,  
 ) {
   try {
     const wsProvider = new WsProvider(GGXCHAINURL);
@@ -319,6 +320,7 @@ export async function uploadBoomerangeToGGXChain(
     const strH160 = Buffer.from(bytes).toString("hex");
     const newH160 = strH160.slice(2, -8);
 
+    // console.log("#### newH160 pubkey hash is ", newH160);
     const txHash = await api.tx.btcRelay
       .storeMonitorUtxo(
         "0x" + txid,
@@ -327,6 +329,7 @@ export async function uploadBoomerangeToGGXChain(
           p2pkh: "0x" + newH160,
         },
         blockHeight,
+        amount,
       )
       .signAndSend(keyPair);
 

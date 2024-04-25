@@ -140,7 +140,7 @@ export async function createBoomerangAmount(
   const txid = (await broadcast(tx.toHex()))?.result;
   console.log(`Success! Txid is ${txid}, index is 0`);
 
-  return txid;
+  return [txid, amount - gas];
 }
 
 export async function recoverLockAmount(

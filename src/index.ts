@@ -100,7 +100,7 @@ async function main() {
       console.log("### user address ", userPayment.address);
 
       const gas = 300;
-      const txid = await createBoomerangAmount(
+      const [txid, amount] = await createBoomerangAmount(
         keyPair,
         options.utxoTxid,
         options.utxoIndex,
@@ -124,6 +124,7 @@ async function main() {
         0,
         height,
         userPayment,
+        amount,
         GGXCliAccount,
       );
 
